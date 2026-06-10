@@ -93,6 +93,9 @@ public:
      * Write data to the file.
      */
     void Write(const char* data, size_t dataLen);
+    void Write(const std::string& data) { Write(data.c_str(), data.size()); }
+    void Write(const u8* data, size_t dataLen) { Write((const char*)data,dataLen); }
+    void Write(const std::vector<u8>& data) { Write((const char*) data.data(),data.size()); }
 
     FILE* ToInner();
 };

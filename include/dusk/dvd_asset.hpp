@@ -5,6 +5,15 @@
 
 namespace dusk {
 
+struct DolHeader {
+    BE(u32) textOffset[7];
+    BE(u32) dataOffset[11];
+    BE(u32) textAddr[7];
+    BE(u32) dataAddr[11];
+    BE(u32) textSize[7];
+    BE(u32) dataSize[11];
+};
+
 struct OffsetVersion {
     version::GameVersion mGameVersion;
     u32 mOffset;

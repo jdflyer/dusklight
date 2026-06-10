@@ -7,6 +7,7 @@
 #include <aurora/main.h>
 #include "dusk/main.h"
 #include "dusk/io.hpp"
+#include "dusk/assets/assets_main.hpp"
 
 #include <algorithm>
 #include <array>
@@ -209,6 +210,9 @@ int RunWindowsGuiEntryPoint() {
 }
 #else
 int DuskMain(int argc, char* argv[]) {
+    if (argc > 1 && std::string("assets") == argv[1]) {
+        return dusk::assets::assets_main(argc,argv);
+    }
     const int result = game_main(argc, argv);
     if (dusk::RestartRequested && RestartProcess(argc, argv)) {
         return 0;

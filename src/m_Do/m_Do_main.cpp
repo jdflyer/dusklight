@@ -523,7 +523,8 @@ int game_main(int argc, char* argv[]) {
             ("console", "Show the Windows console window for logs", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
             ("dvd", "Path to DVD image file", cxxopts::value<std::string>())
             ("backend", "Graphics API backend to use (auto, d3d12, d3d11, metal, vulkan, null)", cxxopts::value<std::string>())
-            ("cvar", "Override configuration variables without modifying config", cxxopts::value<std::vector<std::string>>());
+            ("cvar", "Override configuration variables without modifying config", cxxopts::value<std::vector<std::string>>())
+            ("develop","Enable the in-game development mode",cxxopts::value<bool>()->default_value("false")->implicit_value("true"));
 
         arg_options.parse_positional({"dvd"});
         arg_options.positional_help("<dvd-image>");
@@ -777,6 +778,7 @@ int game_main(int argc, char* argv[]) {
 
     OSInit();
 
+    mDoMain::developmentMode = parsed_arg_options["develop"].as<bool>();
     mDoMain::sPowerOnTime = OSGetTime();
 
     // Reset Data

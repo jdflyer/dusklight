@@ -1546,6 +1546,10 @@ set(DUSK_FILES
         src/dusk/discord_presence.cpp
         src/dusk/version.cpp
         src/dusk/action_bindings.cpp
+        src/dusk/assets/assets_main.cpp
+        src/dusk/assets/assets_unpack.cpp
+        src/dusk/assets/assets_pack.cpp
+        src/dusk/assets/iso.cpp
 )
 
 set(DUSK_HTTP_BACKEND_FILES
