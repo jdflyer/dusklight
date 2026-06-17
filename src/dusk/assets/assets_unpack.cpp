@@ -26,7 +26,7 @@ std::filesystem::path assets_unpack_write(
     bool compressed = false;
     std::vector<u8> decompBuffer;
     std::span<const u8> decompBufferSpan;
-    if (false && JKRDecomp::checkCompressed((u8*)buffer.data()) !=
+    if (JKRDecomp::checkCompressed((u8*)buffer.data()) !=
         COMPRESSION_NONE) {  // Gross cast here but that's just how JSystem works lol
         u32 outputSize = JKRDecompExpandSize((u8*)buffer.data());
         decompBuffer.resize(outputSize);
