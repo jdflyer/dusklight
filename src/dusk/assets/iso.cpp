@@ -55,7 +55,7 @@ std::array<PathPriority, 57> defaultBootOrder = {{{"str/Final/Release/COPYDATE"}
 
 // Creates a boot.bin that dolphin can use to launch an unpackaged iso
 const std::vector<u8> boot_bin_pack(const std::filesystem::path& source) {
-    const std::vector<u8> buffer(sizeof(DVDDiskID_JSON)+sizeof(DVDBB2_BE));
+    const std::vector<u8> buffer(sizeof(DVDDiskID_JSON) + sizeof(DVDBB2_BE));
 
     std::ifstream bootJsonFile(source);
     auto bootJson = nlohmann::json::parse(bootJsonFile);
@@ -65,7 +65,7 @@ const std::vector<u8> boot_bin_pack(const std::filesystem::path& source) {
 }
 
 void iso_parse_fst(const std::filesystem::path& filesystemPath, const std::span<const u8>& fst,
-    const std::span<const u8>& fullBuffer, writeFunctionType writeFunction) {
+    const std::span<const u8>& fullBuffer) {
     auto entries = (const DVDEntry_BE*)&fst.data()[0];
 
     auto& root = entries[0];
@@ -98,14 +98,14 @@ void iso_parse_fst(const std::filesystem::path& filesystemPath, const std::span<
             }
             std::filesystem::path filePath = dvdPathFull / fileEntry.getName(stringTable);
             printf("Extracting: %s\n", filePath.c_str());
-            writeFunction(
-                filePath, fullBuffer.subspan(fileEntry.entryOffset, fileEntry.entryLength));
+            assets_unpack_write(
+                filePath, fullBuffer.subspan(fileEntry.entryOffset, fileEntry.entryLength), filePath);
         }
     }
 }
 
 const std::filesystem::path iso_unpack(const std::filesystem::path& outputName,
-    const std::span<const u8>& buffer, writeFunctionType writeFunction) {
+    const std::span<const u8>& buffer) {
     const u8* data = buffer.data();
     auto diskId = (const DVDDiskID_JSON*)&data[0];
 
@@ -117,13 +117,13 @@ const std::filesystem::path iso_unpack(const std::filesystem::path& outputName,
 
     nlohmann::ordered_json json;
     json["tool_version"] = 1;
-    writeFunction(outputName / "sys" / "bi2.bin", buffer.subspan(0x440, 0x2000));
+    assets_unpack_write(outputName / "sys" / "bi2.bin", buffer.subspan(0x440, 0x2000), outputName / "sys" / "bi2.bin");
     json["bi2Path"] = "sys/bi2.bin";
 
     BE(u32) apploaderSize = *(BE<u32>*)&data[0x2440 + 0x14];
     BE(u32) trailerSize = *(BE<u32>*)&data[0x2440 + 0x18] + 0x20;
-    writeFunction(
-        outputName / "sys" / "apploader.img", buffer.subspan(0x2440, apploaderSize + trailerSize));
+    assets_unpack_write(
+        outputName / "sys" / "apploader.img", buffer.subspan(0x2440, apploaderSize + trailerSize), outputName / "sys" / "apploader.img");
     json["apploaderPath"] = "sys/apploader.img";
 
     auto bb2 = (const DVDBB2_BE*)&data[0x420];
@@ -145,7 +145,7 @@ const std::filesystem::path iso_unpack(const std::filesystem::path& outputName,
     }
     // printf("dolSize 0x%X\n",dolSize);
 
-    writeFunction(outputName / "sys" / "main.dol", buffer.subspan(bb2->bootFilePosition, dolSize));
+    assets_unpack_write(outputName / "sys" / "main.dol", buffer.subspan(bb2->bootFilePosition, dolSize) ,outputName / "sys" / "main.dol");
     json["dolPath"] = "sys/main.dol";
     json["bootPath"] = "sys/boot.bin.json";
 
@@ -164,7 +164,7 @@ const std::filesystem::path iso_unpack(const std::filesystem::path& outputName,
         std::filesystem::create_directories(filesystemPath);
     }
     iso_parse_fst(
-        filesystemPath, buffer.subspan(bb2->FSTPosition, bb2->FSTLength), buffer, writeFunction);
+        filesystemPath, buffer.subspan(bb2->FSTPosition, bb2->FSTLength), buffer);
 
     for (const auto& entry : std::filesystem::recursive_directory_iterator(outputName / "files")) {
         if (!entry.is_directory()) {
@@ -206,16 +206,17 @@ size_t iso_pack_recurse_fst(const std::filesystem::path& original,
             continue;  // We handle these after the async functions have run
         }
         sem.acquire();
-        futures.push_back(std::async(std::launch::async, [=, &sem, &localEntriesMutex, &localEntries] {
-            std::vector<u8> file;
-            auto out = assets_pack_convert_entry(entry.path(), entry.path(), &file);
-            auto rel = std::filesystem::relative(out, original);
-            {
-                std::lock_guard<std::mutex> lock(localEntriesMutex);
-                localEntries[i] = {std::move(file), rel, false, 0, parentIndex};
-            }
-            sem.release();
-        }));
+        futures.push_back(
+            std::async(std::launch::async, [=, &sem, &localEntriesMutex, &localEntries] {
+                std::vector<u8> file;
+                auto out = assets_pack_convert_entry(entry.path(), entry.path(), &file);
+                auto rel = std::filesystem::relative(out, original);
+                {
+                    std::lock_guard<std::mutex> lock(localEntriesMutex);
+                    localEntries[i] = {std::move(file), rel, false, 0, parentIndex};
+                }
+                sem.release();
+            }));
     }
 
     for (auto& f : futures) {
@@ -256,16 +257,25 @@ const std::vector<u8> iso_pack(const std::filesystem::path& source) {
 
     auto j = nlohmann::json::parse(diskJsonFile);
 
-    std::ifstream bootJsonFile(source / j.at("bootPath"));
-    auto bootJson = nlohmann::json::parse(bootJsonFile);
-    DVDDiskID_JSON diskId = DVDDiskID_JSON::from_json(bootJson);
+    // Allow conversion from both the original boot.bin.json, and the version that dolphin likes to
+    // use in sys/boot.bin
+    std::filesystem::path bootBinPath = source / j.at("bootPath");
+    std::vector<u8> diskIdData(sizeof(DVDDiskID_JSON));
+    if (std::filesystem::exists(bootBinPath)) {
+        diskIdData = boot_bin_pack(bootBinPath);
+    } else {
+        bootBinPath = source / "sys" / "boot.bin";
+        if (!std::filesystem::exists(bootBinPath)) {
+            throw std::runtime_error(std::string(bootBinPath.string() + " does not exist!"));
+        }
+        diskIdData = dusk::io::FileStream::ReadAllBytes(bootBinPath);
+    }
 
     std::vector<u8> bi2 = dusk::io::FileStream::ReadAllBytes(source / j.at("bi2Path"));
     std::vector<u8> apploader = dusk::io::FileStream::ReadAllBytes(source / j.at("apploaderPath"));
     std::vector<u8> dol = dusk::io::FileStream::ReadAllBytes(source / j.at("dolPath"));
 
     size_t dolPosition = ALIGN_NEXT(0x2440 + apploader.size(), 0x100);
-    
 
     std::filesystem::path dvdPath = source / j.at("dvdPath");
     size_t fstPosition = ALIGN_NEXT(dolPosition + dol.size(), 0x100);
@@ -376,7 +386,7 @@ const std::vector<u8> iso_pack(const std::filesystem::path& source) {
 
     memcpy(&fst[fstEntries.size()], stringTable.data(), stringTable.size());
 
-    memcpy(&data[0], &diskId, sizeof(diskId));
+    memcpy(&data[0], diskIdData.data(), sizeof(DVDDiskID_JSON));
     memcpy(&data[0x440], bi2.data(), bi2.size());
     memcpy(&data[0x2440], apploader.data(), apploader.size());
     memcpy(&data[dolPosition], dol.data(), dol.size());

@@ -172,6 +172,8 @@ void yaz0_encode(const std::span<const u8>& src, std::vector<u8>& dst)
         for (int j = 0; j < bufPos; j++)
             dst.push_back(buf[j]);
 
+    }else {
+        dst.push_back(0);
     }
 }
 
@@ -188,7 +190,7 @@ std::vector<u8> Yaz0Compress(const std::span<const u8>& src) {
 
     yaz0_encode(src,result); 
 
-    result.resize(ALIGN_NEXT(result.size(),0x20));
+    // result.resize(ALIGN_NEXT(result.size(),0x20));
 
     return result;
 }

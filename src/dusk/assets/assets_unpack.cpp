@@ -2,16 +2,25 @@
 
 #include "dusk/assets/assets_unpack.hpp"
 #include "dusk/assets/iso.hpp"
+#include "dusk/assets/arc.hpp"
 #include "dusk/io.hpp"
 
 #include "JSystem/JKernel/JKRDecomp.h"
 
 namespace dusk::assets {
 
+const std::filesystem::path assets_unpack_convertFunction_None(
+    const std::filesystem::path& outputPath,
+    const std::span<const u8>& buffer) {
+    auto fs = dusk::io::FileStream::Create(outputPath);
+    fs.Write(buffer.data(), buffer.size());
+    return outputPath;
+}
+
 const std::unordered_map<std::string, unpackConvertFunctionType> unpackConvTable = {
     {".iso", iso_unpack},
-    // {".arc", arc_unpack},
-    // {"speakerse.arc", assets_unpack_convertFunction_None}
+    {".arc", arc_unpack},
+    {"speakerse.arc", assets_unpack_convertFunction_None},
 };
 
 // const std::unordered_map<std::string, unpackConvertFunctionType> convTable = {
@@ -21,12 +30,12 @@ const std::unordered_map<std::string, unpackConvertFunctionType> unpackConvTable
 void assets_unpack_check_dir(const std::filesystem::path& path) {}
 
 std::filesystem::path assets_unpack_write(
-    const std::filesystem::path& name, const std::span<const u8>& buffer) {
+    const std::filesystem::path& name, const std::span<const u8>& buffer, const std::filesystem::path& inputName) {
     const std::span<const u8>* outputBuffer = &buffer;
     bool compressed = false;
     std::vector<u8> decompBuffer;
     std::span<const u8> decompBufferSpan;
-    if (JKRDecomp::checkCompressed((u8*)buffer.data()) !=
+    if (buffer.size() >= 4 && JKRDecomp::checkCompressed((u8*)buffer.data()) !=
         COMPRESSION_NONE) {  // Gross cast here but that's just how JSystem works lol
         u32 outputSize = JKRDecompExpandSize((u8*)buffer.data());
         decompBuffer.resize(outputSize);
@@ -41,13 +50,13 @@ std::filesystem::path assets_unpack_write(
 
     // Search the table first by full filename, then by extension
 
-    const std::string fullName = name.filename();
+    const std::string fullName = inputName.filename();
     auto it = unpackConvTable.find(fullName);
     if (it != unpackConvTable.end()) {
         convertFunction = it->second;
     }
 
-    const std::string ext = name.extension().string();
+    const std::string ext = inputName.extension().string();
     if (convertFunction == nullptr) {
         it = unpackConvTable.find(ext);
         if (it != unpackConvTable.end()) {
@@ -57,11 +66,11 @@ std::filesystem::path assets_unpack_write(
 
     std::string compressedFlag = compressed ? ".c" : "";
     const std::filesystem::path outputPath =
-        name.parent_path() / (name.stem().string() + compressedFlag + ext);
+        name.parent_path() / (name.stem().string() + compressedFlag + name.extension().string());
 
     // Convert the file if any candidates
     if (convertFunction != nullptr) {
-        return convertFunction(outputPath, *outputBuffer, assets_unpack_write);
+        return convertFunction(outputPath, *outputBuffer);
     }
 
     // Otherwise, write the file
@@ -70,17 +79,9 @@ std::filesystem::path assets_unpack_write(
     return outputPath;
 }
 
-const std::filesystem::path assets_unpack_convertFunction_None(
-    const std::filesystem::path& outputPath, const std::vector<u8>& buffer,
-    writeFunctionType writeFunction) {
-    auto fs = dusk::io::FileStream::Create(outputPath);
-    fs.Write(buffer.data(), buffer.size());
-    return outputPath;
-}
-
 int assets_unpack_main(const std::filesystem::path& input, const std::filesystem::path& output) {
     const auto buffer = dusk::io::FileStream::ReadAllBytes(input);
-    assets_unpack_write(output, std::span<const u8>(buffer));
+    assets_unpack_write(output, std::span<const u8>(buffer), input);
     return 0;
 }
 

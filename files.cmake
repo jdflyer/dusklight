@@ -1408,6 +1408,7 @@ set(DOLPHIN_FILES
     libs/dolphin/src/gf/GFLight.cpp
     libs/dolphin/src/gf/GFPixel.cpp
     libs/dolphin/src/gf/GFTev.cpp
+    libs/dolphin/src/os/OSUtf.c
 )
 
 set(DUSK_FILES
@@ -1551,6 +1552,7 @@ set(DUSK_FILES
         src/dusk/assets/assets_pack.cpp
         src/dusk/assets/iso.cpp
         src/dusk/assets/yaz0_compress.cpp
+        src/dusk/assets/arc.cpp
 )
 
 set(DUSK_HTTP_BACKEND_FILES

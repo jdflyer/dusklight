@@ -81,7 +81,7 @@ struct DVDDiskID_JSON {
 };
 
 const std::filesystem::path iso_unpack(const std::filesystem::path& outputName,
-    const std::span<const u8>& buffer, writeFunctionType writeFunction);
+    const std::span<const u8>& buffer);
 const std::vector<u8> boot_bin_pack(const std::filesystem::path& source);
 const std::vector<u8> iso_pack(const std::filesystem::path& source);
 

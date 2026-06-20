@@ -4,17 +4,25 @@
 #include <semaphore>
 #include <future>
 #include "dusk/assets/iso.hpp"
+#include "dusk/assets/arc.hpp"
 #include "dusk/io.hpp"
 #include "dusk/assets/yaz0_compress.hpp"
 
 namespace dusk::assets {
 
+const std::vector<u8> assets_pack_convertFunction_None(const std::filesystem::path& source) {
+    return dusk::io::FileStream::ReadAllBytes(source);
+}
+
 const std::unordered_map<std::string, packDef> packConvTable = {
     {".iso", {iso_pack, ".iso", true}},
-    {"boot.bin.json", {boot_bin_pack, ".bin", false}},
-    // {".arc", arc_pack},
-    // {"speakerse.arc", assets_pack_convertFunction_None}
+    {"boot.bin.json", {boot_bin_pack, ".bin", false, 1}},
+    {".arc", {arc_pack, ".arc", true}},
+    {"speakerse.arc", {assets_pack_convertFunction_None, ".arc", false}}
 };
+
+std::shared_mutex AssetPackOptions::s_mutex;
+AssetPackOptions AssetPackOptions::s_options;
 
 // const std::unordered_map<std::string, packConvertFunctionType> dirPackConvTable = {
 // {"/Audiores/Waves/",jaudio_wave_dir_pack}
@@ -77,26 +85,33 @@ std::filesystem::path assets_pack_convert_entry(
                          outputPath.stem().stem().string() + outputPath.extension().string());
     }
 
+    if (AssetPackOptions::getOptions().noCompress) {
+        doCompress = false;
+    }
+
     packConvertBinaryFunctionType convFunction = nullptr;
     std::string newExtension = outputPath.extension();
+    int numExtensionsToStrip = 0;
 
     // First, search all explicit names
     auto it = packConvTable.find(sourcePath.filename());
     if (it != packConvTable.end()) {
-        if (!isDir || (isDir && it->second.sourceIsDir)) {
+        if ((!isDir && it->second.sourceIsDir == false) || (isDir && it->second.sourceIsDir)) {
             convFunction = it->second.convFunction;
+            newExtension = it->second.dstExtension;
+            numExtensionsToStrip = it->second.numExtensionsToStrip;
         }
-        newExtension = it->second.dstExtension;
     }
 
     // Next, search by extension
     if (convFunction == nullptr) {
         it = packConvTable.find(sourcePath.extension().string());
         if (it != packConvTable.end()) {
-            if (!isDir || (isDir && it->second.sourceIsDir)) {
+            if ((!isDir && it->second.sourceIsDir == false) || (isDir && it->second.sourceIsDir)) {
                 convFunction = it->second.convFunction;
+                newExtension = it->second.dstExtension;
+                numExtensionsToStrip = it->second.numExtensionsToStrip;
             }
-            newExtension = it->second.dstExtension;
         }
     }
 
@@ -104,9 +119,8 @@ std::filesystem::path assets_pack_convert_entry(
         return outputPath;
     }
 
-
     auto stem = outputPath.stem();
-    while (stem.has_extension()) {
+    for (int i = 0; i < numExtensionsToStrip; i++) {
         stem = stem.stem();
     }
     outputPath = outputPath.parent_path() / std::filesystem::path(stem.string() + newExtension);
@@ -133,7 +147,7 @@ std::filesystem::path assets_pack_convert_entry(
             *outputBuffer = dusk::io::FileStream::ReadAllBytes(sourcePath);
         }
         compressedBuffer = Yaz0Compress({*outputBuffer});
-        outputBuffer = &compressedBuffer;
+        *outputBuffer = compressedBuffer;
     }
 
     if (output != nullptr) {
@@ -185,9 +199,9 @@ void assets_pack_copy_recurse(
     }
 }
 
-int assets_pack_main(const std::filesystem::path& input, const std::filesystem::path& output) {
-    auto it = packConvTable.find(input.extension().string());
-    if (it != packConvTable.end()) {
+int assets_pack_main(const std::filesystem::path& input, const std::filesystem::path& output, const AssetPackOptions& options) {
+    AssetPackOptions::setOptions(options);
+    if (packConvTable.find(input.extension().string()) != packConvTable.end() || packConvTable.find(input.filename().string()) != packConvTable.end()) {
         // If argument is an asset, convert it right away
         assets_pack_convert_entry(input, output, nullptr);
     } else {

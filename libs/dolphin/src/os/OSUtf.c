@@ -4470,7 +4470,44 @@ static u16 UcsFF[256] = {
 	0x0000, 0x0000, 0x0000, 0x0000
 };
 
+#ifdef TARGET_PC
+static u16* UcsSjisTable[256] = {
+    Ucs00, 0, 0, Ucs03, Ucs04, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    Ucs20, Ucs21, Ucs22, Ucs23, 0, Ucs25, Ucs26, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, Ucs4E, Ucs4F,
+    Ucs50, Ucs51, Ucs52, Ucs53, Ucs54, Ucs55, Ucs56, Ucs57,
+    Ucs58, Ucs59, Ucs5A, Ucs5B, Ucs5C, Ucs5D, Ucs5E, Ucs5F,
+    Ucs60, Ucs61, Ucs62, Ucs63, Ucs64, Ucs65, Ucs66, Ucs67,
+    Ucs68, Ucs69, Ucs6A, Ucs6B, Ucs6C, Ucs6D, Ucs6E, Ucs6F,
+    Ucs70, Ucs71, Ucs72, Ucs73, Ucs74, Ucs75, Ucs76, Ucs77,
+    Ucs78, Ucs79, Ucs7A, Ucs7B, Ucs7C, Ucs7D, Ucs7E, Ucs7F,
+    Ucs80, Ucs81, Ucs82, Ucs83, Ucs84, Ucs85, Ucs86, Ucs87,
+    Ucs88, Ucs89, Ucs8A, Ucs8B, Ucs8C, Ucs8D, Ucs8E, Ucs8F,
+    Ucs90, Ucs91, Ucs92, Ucs93, Ucs94, Ucs95, Ucs96, Ucs97,
+    Ucs98, Ucs99, Ucs9A, Ucs9B, Ucs9C, Ucs9D, Ucs9E, Ucs9F,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, UcsFF,
+};
+#else
 static u16* UcsSjisTable[256] = {0};
+#endif
 
 u16 OSUTF32toSJIS(u32 utf32) {
     u16* table;
@@ -6327,7 +6364,30 @@ static u16 SjisEA[256] = {
 	0x0000, 0x0000, 0x0000, 0x0000
 };
 
+#ifdef TARGET_PC
+static u16* SjisUcsTable[256] = {
+    Sjis00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, Sjis81, Sjis82, Sjis83, Sjis84, 0, 0, 0,
+    Sjis88, Sjis89, Sjis8A, Sjis8B, Sjis8C, Sjis8D, Sjis8E, Sjis8F,
+    Sjis90, Sjis91, Sjis92, Sjis93, Sjis94, Sjis95, Sjis96, Sjis97,
+    Sjis98, Sjis99, Sjis9A, Sjis9B, Sjis9C, Sjis9D, Sjis9E, Sjis9F,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    SjisE0, SjisE1, SjisE2, SjisE3, SjisE4, SjisE5, SjisE6, SjisE7,
+    SjisE8, SjisE9, SjisEA
+};
+#else
 static u16* SjisUcsTable[256] = {0};
+#endif
 
 u32 OSSJIStoUTF32(u16 sjis) {
     u16* table;
