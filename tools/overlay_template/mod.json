@@ -1,0 +1,8 @@
+{
+    "id": "example.overlay_template",
+    "name": "Overlay Template Mod",
+    "version": "1.0.0",
+    "author": "jdflyer",
+    "description": "An example Dusk mod for only overlaying files",
+    "has_code": false
+}
