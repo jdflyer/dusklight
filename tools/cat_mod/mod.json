@@ -1,5 +1,6 @@
 {
     "name": "Chloe the Cat",
+    "id": "cat_mod",
     "version": "1.0.0",
     "author": "Maddie",
     "description": "Carry your new kitty companion Chloe throughout your adventure, but don't let her die!"

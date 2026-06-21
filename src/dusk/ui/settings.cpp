@@ -1349,7 +1349,7 @@ SettingsWindow::SettingsWindow(bool prelaunch) : mPrelaunch(prelaunch) {
                     [] {
                         return kMagicArmorModes[static_cast<u8>(getSettings().game.armorRupeeDrain.getValue())];
                     },
-                .isDisabled = [] { return getSettings().game.speedrunMode; },
+                .isDisabled = [] { return getSettings().game.speedrunMode.getValue(); },
                 .isModified =
                     [] {
                         return getSettings().game.armorRupeeDrain.getValue() !=
