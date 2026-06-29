@@ -24,6 +24,7 @@
 #include "JSystem/JUtility/JUTConsole.h"
 
 #ifdef TARGET_PC
+#include <sstream>
 #include "dusk/logging.h"
 #include "dusk/version.hpp"
 #include "dusk/main.h"
