@@ -23,8 +23,12 @@
 #include "m_Do/m_Do_main.h"
 #include "JSystem/JUtility/JUTConsole.h"
 
+#ifdef TARGET_PC
 #include "dusk/logging.h"
 #include "dusk/version.hpp"
+#include "dusk/main.h"
+#include "m_Do/m_Do_MemCard.h"
+#endif
 
 #if !PLATFORM_GCN
 #include <revolution/os.h>
@@ -757,7 +761,80 @@ void dScnLogo_c::nextSceneChange() {
     if (!mDoRst::isReset()) {
         if (!isOpeningCut())
         {
-            dComIfG_changeOpeningScene(this, fpcNm_OPENING_SCENE_e);
+#ifdef TARGET_PC
+            // If we are requesting a save from the command line, load it here and set the scene to play instead of loading the LOGO SCENE
+            if (dusk::SaveRequested >= 1 && dusk::SaveRequested <= 3) {
+                u8 buf[SAVEDATA_SIZE * 3];
+                mDoMemCd_Load();
+                uint8_t status;
+                do {
+                    status = mDoMemCd_LoadSync(buf, sizeof(buf), 0);
+                    // Wait until the card is loaded
+                } while (status == 0);
+            
+                if (status == 1) {
+                    dComIfGs_setCardToMemory(buf, dusk::SaveRequested - 1);
+                } else {
+                    dComIfGs_init();
+                }
+            
+                dComIfGs_setNoFile(dusk::SaveRequested);
+                dComIfGs_setDataNum(dusk::SaveRequested-1);
+
+                dComIfGs_gameStart();
+            
+                fopScnM_ChangeReq(this, fpcNm_PLAY_SCENE_e, 0, 30);
+            
+                dKy_clear_game_init();
+                dComIfGs_resetDan();
+                dComIfGs_setRestartRoomParam(0);
+            
+                DuskLog.info("Loaded Save From Slot {}",dusk::SaveRequested);
+                dusk::SaveRequested = 0xff;
+            } else if (dusk::SaveRequested == 0xff) {
+                // This indicates that the save has loaded, but we are waiting for the scene
+                // manager to change to play
+            } else if (dusk::StageRequested.size() > 0) {
+                
+            } else{
+#endif
+                dComIfG_changeOpeningScene(this, fpcNm_OPENING_SCENE_e);
+#ifdef TARGET_PC
+            }
+
+            if (dusk::StageRequested.size() > 0) {
+                std::stringstream ss(dusk::StageRequested);
+                std::string token;
+
+                std::getline(ss,token,',');
+                std::string stageName = token;
+                s8 room = 0;
+                s16 point = 0;
+                s8 layer = -1;
+                if (std::getline(ss,token,',')) {
+                    room = std::stoi(token);
+                    if (std::getline(ss,token,',')) {
+                        point = std::stoi(token);
+                        if (std::getline(ss,token,',')) {
+                            layer = std::stoi(token);
+                        }
+                    }
+                }
+
+                if (dusk::SaveRequested == 0) {
+                    dComIfGs_init();
+
+                    fopScnM_ChangeReq(this, fpcNm_PLAY_SCENE_e, 0, 30);
+                    dusk::SaveRequested = 0xff; //Skip requesting the scene from above
+                }
+
+                // Use both to force-set start stage
+                dComIfGp_setNextStage(stageName.c_str(), point, room, layer);
+                g_dComIfG_gameInfo.play.mNextStage.getStartStage()->set(stageName.c_str(),point,room,layer);
+
+                dusk::StageRequested = ""; //Reset so we don't re-do this
+            }
+#endif
         } else {
             #if DEBUG
             fopScnM_ChangeReq(this, fpcNm_MENU_SCENE_e, 0, 30);

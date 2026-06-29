@@ -124,6 +124,8 @@ bool dusk::IsRunning = true;
 bool dusk::IsShuttingDown = false;
 bool dusk::IsGameLaunched = false;
 bool dusk::RestartRequested = false;
+uint8_t dusk::SaveRequested = 0;
+std::string dusk::StageRequested;
 std::filesystem::path dusk::ConfigPath;
 std::filesystem::path dusk::CachePath;
 #endif
@@ -523,7 +525,10 @@ int game_main(int argc, char* argv[]) {
             ("console", "Show the Windows console window for logs", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
             ("dvd", "Path to DVD image file", cxxopts::value<std::string>())
             ("backend", "Graphics API backend to use (auto, d3d12, d3d11, metal, vulkan, null)", cxxopts::value<std::string>())
-            ("cvar", "Override configuration variables without modifying config", cxxopts::value<std::vector<std::string>>());
+            ("cvar", "Override configuration variables without modifying config", cxxopts::value<std::vector<std::string>>())
+            ("develop", "Enable the game's developer mode and OSReport for debugging", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
+            ("load-save", "Skip the opening and load a save from slot 1-3", cxxopts::value<uint8_t>()->default_value("0"))
+            ("stage", "Upon launching, load a stage, room, spawn point, and layer. Format (STAGE,ROOM,POINT,LAYER). Example: (STAGE) or (STAGE,0,0,-1)", cxxopts::value<std::string>());
 
         arg_options.parse_positional({"dvd"});
         arg_options.positional_help("<dvd-image>");
@@ -548,6 +553,12 @@ int game_main(int argc, char* argv[]) {
     dusk::ConfigPath = dataPaths.userPath;
     dusk::CachePath = dataPaths.cachePath;
     dusk::InitializeFileLogging(dusk::CachePath, startupLogLevel);
+
+    // Development Mode
+    if (parsed_arg_options.count("develop")) {
+        mDoMain::developmentMode = parsed_arg_options["develop"].as<bool>();  // Enable Dev Mode for Debugging
+        dusk::OSReportReallyForceEnable = parsed_arg_options["develop"].as<bool>();  // Print OSReport to console
+    }
 
     log_build_info();
 
@@ -788,12 +799,20 @@ int game_main(int argc, char* argv[]) {
     // Global Context Init
     dComIfG_ct();
 
-    // Development Mode
-    // mDoMain::developmentMode = 1;  // Force Dev Mode for Debugging
+    // Load save from here
+    if (parsed_arg_options.contains("load-save")){
+        uint8_t slot = parsed_arg_options["load-save"].as<uint8_t>();
+        if (slot >= 1 && slot <= 3) {
+            dusk::SaveRequested = slot;
+        }   
+    }
+    if (parsed_arg_options.contains("stage")) {
+        dusk::StageRequested = parsed_arg_options["stage"].as<std::string>();
+    }
+
     mDoDvdThd::SyncWidthSound = false;
 
     OSReport("Starting main01 (Game Loop)...\n");
-
 
     main01();
 
