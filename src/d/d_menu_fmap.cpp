@@ -2486,11 +2486,6 @@ void dMenu_Fmap_c::portalWarpMapMove(STControl* i_stick) {
     f32 arrow_y = mpDraw2DBack->getArrowPos2DY();
     u8 uVar6 = 0xff;
 
-#if TARGET_PC
-    if (dusk::getSettings().game.enableMirrorMode) {
-        arrow_x = mpDraw2DBack->getMirrorPosX(arrow_x, 0.0f);
-    }
-#endif
 
 
     for (int i = 0; i < portal_dat->mCount; i++) {
