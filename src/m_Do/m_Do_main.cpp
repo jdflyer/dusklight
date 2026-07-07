@@ -249,12 +249,12 @@ void main01(void) {
                 goto eventsDone;
             case AURORA_PAUSED:
                 dusk::audio::SetPaused(true);
-                dusk::mouse::onFocusLost();
+                dusk::mouse::on_focus_lost();
                 break;
             case AURORA_UNPAUSED:
                 dusk::audio::SetPaused(false);
                 dusk::game_clock::reset_frame_timer();
-                dusk::mouse::onFocusGained();
+                dusk::mouse::on_focus_gained();
                 break;
             case AURORA_SDL_EVENT:
                 dusk::mouse::handle_event(event->sdl);
@@ -265,7 +265,7 @@ void main01(void) {
                 if (dusk::getSettings().video.rememberWindowSize && !dusk::getSettings().video.enableFullscreen) {
                     dusk::getSettings().video.lastWindowWidth.setValue(event->windowSize.width);
                     dusk::getSettings().video.lastWindowHeight.setValue(event->windowSize.height);
-                    dusk::config::Save();
+                    dusk::config::save();
                 }
                 break;
             case AURORA_DISPLAY_SCALE_CHANGED:
@@ -430,16 +430,7 @@ static void ApplyCVarOverrides(const cxxopts::OptionValue& option) {
         const auto name = std::string_view(cvarArg).substr(0, sep);
         const auto value = std::string_view(cvarArg).substr(sep + 1);
 
-        const auto cVar = dusk::config::GetConfigVar(name);
-        if (!cVar) {
-            DuskLog.fatal("Unknown --cvar name: '{}'", name);
-        }
-
-        try {
-            cVar->getImpl()->loadFromArg(*cVar, value);
-        } catch (const std::exception& e) {
-            DuskLog.fatal("Unable to parse: '{}': {}", value, e.what());
-        }
+        dusk::config::load_arg_override(name, value);
     }
 }
 
@@ -510,7 +501,6 @@ int game_main(int argc, char* argv[]) {
     mainCalled = true;
 
     dusk::registerSettings();
-    dusk::config::FinishRegistration();
 
     cxxopts::ParseResult parsed_arg_options;
 
@@ -552,10 +542,7 @@ int game_main(int argc, char* argv[]) {
 
     log_build_info();
 
-    dusk::config::LoadFromUserPreferences();
-    if (dusk::getSettings().game.speedrunMode) {
-        dusk::resetForSpeedrunMode();
-    }
+    dusk::config::load_from_user_preferences();
     ApplyCVarOverrides(parsed_arg_options["cvar"]);
     dusk::android::update_surface_frame_rate();
     dusk::crash_reporting::initialize();
@@ -617,6 +604,12 @@ int game_main(int argc, char* argv[]) {
         config.imGuiInitCallback = &aurora_imgui_init_callback;
         config.allowTextureDumps = false;
         auroraInfo = aurora_initialize(argc, argv, &config);
+    }
+
+    // Apply after aurora_initialize: speedrun mode mutates cvars whose change callbacks push
+    // values into aurora.
+    if (dusk::getSettings().game.speedrunMode) {
+        dusk::resetForSpeedrunMode();
     }
 
 #ifdef DUSK_DISCORD
@@ -701,7 +694,7 @@ int game_main(int argc, char* argv[]) {
                 dusk::getSettings().backend.isoPath.setValue(dvd_path);
                 dusk::getSettings().backend.isoVerification.setValue(
                     dusk::DiscVerificationState::Unknown);
-                dusk::config::Save();
+                dusk::config::save();
                 dusk::IsGameLaunched = true;
             }
         } else {
@@ -724,7 +717,7 @@ int game_main(int argc, char* argv[]) {
             saveConfigBeforePrelaunch = true;
         }
         if (saveConfigBeforePrelaunch) {
-            dusk::config::Save();
+            dusk::config::save();
         }
 
         if (!dusk::getSettings().backend.skipPreLaunchUI) {
@@ -816,6 +809,7 @@ int game_main(int argc, char* argv[]) {
 #endif
     dusk::ui::shutdown();
     dusk::texture_replacements::shutdown();
+    dusk::config::shutdown();
     aurora_shutdown();
 
     return 0;
