@@ -1553,6 +1553,7 @@ set(DUSK_FILES
         src/dusk/assets/iso.cpp
         src/dusk/assets/yaz0_compress.cpp
         src/dusk/assets/arc.cpp
+        src/dusk/assets/timg.cpp
 )
 
 set(DUSK_HTTP_BACKEND_FILES

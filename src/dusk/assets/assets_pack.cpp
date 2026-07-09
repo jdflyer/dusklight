@@ -5,6 +5,7 @@
 #include <future>
 #include "dusk/assets/iso.hpp"
 #include "dusk/assets/arc.hpp"
+#include "dusk/assets/timg.hpp"
 #include "dusk/io.hpp"
 #include "dusk/assets/yaz0_compress.hpp"
 
@@ -18,7 +19,8 @@ const std::unordered_map<std::string, packDef> packConvTable = {
     {".iso", {iso_pack, ".iso", true}},
     {"boot.bin.json", {boot_bin_pack, ".bin", false, 1}},
     {".arc", {arc_pack, ".arc", true}},
-    {"speakerse.arc", {assets_pack_convertFunction_None, ".arc", false}}
+    {"speakerse.arc", {assets_pack_convertFunction_None, ".arc", false}},
+    {".bti", {bti_pack, ".bti", true}}
 };
 
 std::shared_mutex AssetPackOptions::s_mutex;
