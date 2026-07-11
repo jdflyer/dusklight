@@ -149,6 +149,8 @@ struct ImageConvertBase {
 
     // Used for both
     std::vector<GXColor> mRgba;
+    u32 mWidth;
+    u32 mHeight;
 
     // Packing images only
     std::vector<u8> mOutputBuffer;
@@ -161,13 +163,14 @@ struct ImageConvertBase {
     virtual std::vector<u8> packBlock(int blockX, int blockY) = 0;
 
     void writePixel(int x, int y, GXColor pixel) {
-        if (x < mHeader.width && y < mHeader.height) {
-            mRgba[(y * mHeader.width) + x] = pixel;
+        if (x < mWidth && y < mHeight) {
+            mRgba[(y * mWidth) + x] = pixel;
         }
     }
+
     GXColor readPixel(int x, int y) {
-        if (x < mHeader.width && y < mHeader.height) {
-            GXColor pixel = mRgba[(y * mHeader.width) + x];
+        if (x < mWidth && y < mHeight) {
+            GXColor pixel = mRgba[(y * mWidth) + x];
             if (mHasAlpha == false && pixel.a < 0xFF) {
                 mHasAlpha = true;
             }
@@ -177,14 +180,14 @@ struct ImageConvertBase {
     }
 
     ImageConvertBase(const ResTIMG& header, const std::span<const u8>& buffer)
-        : mHeader(header), mInputBuffer(buffer), mRgba(header.width * header.height) {}
+        : mHeader(header), mInputBuffer(buffer), mRgba(header.width * header.height), mWidth(header.width), mHeight(header.height) {}
 
     ImageConvertBase(const ResTIMG& header, std::vector<GXColor>& rgba)
-        : mHeader(header), mRgba(rgba) {}
+        : mHeader(header), mRgba(rgba), mWidth(header.width), mHeight(header.height) {}
 
     std::vector<GXColor>& toRGBA() {
-        int widthInBlocks = (mHeader.width + getBlockWidth() - 1) / getBlockWidth();
-        int heightInBlocks = (mHeader.height + getBlockHeight() - 1) / getBlockHeight();
+        int widthInBlocks = (mWidth + getBlockWidth() - 1) / getBlockWidth();
+        int heightInBlocks = (mHeight + getBlockHeight() - 1) / getBlockHeight();
 
         int offset = mHeader.imageOffset;
         for (int y = 0; y < heightInBlocks; y++) {
@@ -198,16 +201,64 @@ struct ImageConvertBase {
         return mRgba;
     }
 
+    // Converts srgb in range 0-1 to linear color space
+    static constexpr float srgbToLinear(float srgb) {
+        return srgb <= 0.04045f ? srgb / 12.92 : std::pow((srgb + 0.055f) / 1.055f, 2.4f);
+    }
+
+    // Converts linear in range 0-1 to srgb color space
+    static constexpr float linearToSrgb(float srgb) {
+        return srgb <= 0.0031308f ? srgb * 12.92f : 1.055f * std::pow(srgb, 1.0f / 2.4f) - 0.055f;
+    }
+
+
+    void mipmap() {
+        // Mutates the mRgba image and halves width and height
+        u32 newWidth = mWidth / 2;
+        u32 newHeight = mHeight / 2;
+
+        std::vector<GXColor> newRgba(newWidth*newHeight);
+        for (u32 y = 0; y < newHeight; y++) {
+            u32 y0 = std::min(y*2, mHeight - 1);
+            u32 y1 = std::min((y*2)+1, mHeight - 1);
+
+            for (u32 x = 0; x < newWidth; x++) {
+                u32 x0 = std::min(x*2, mWidth - 1);
+                u32 x1 = std::min((x*2)+1, mWidth - 1);
+
+                GXColor p0 = readPixel(x0,y0);
+                GXColor p1 = readPixel(x1,y0);
+                GXColor p2 = readPixel(x0,y1);
+                GXColor p3 = readPixel(x1,y1);
+
+                float r = linearToSrgb((srgbToLinear(((float)p0.r)/255.0f)+srgbToLinear(((float)p1.r)/255.0f)+srgbToLinear(((float)p2.r)/255.0f)+srgbToLinear(((float)p3.r)/255.0f))/4.0f);
+                float g = linearToSrgb((srgbToLinear(((float)p0.g)/255.0f)+srgbToLinear(((float)p1.g)/255.0f)+srgbToLinear(((float)p2.g)/255.0f)+srgbToLinear(((float)p3.g)/255.0f))/4.0f);
+                float b = linearToSrgb((srgbToLinear(((float)p0.b)/255.0f)+srgbToLinear(((float)p1.b)/255.0f)+srgbToLinear(((float)p2.b)/255.0f)+srgbToLinear(((float)p3.b)/255.0f))/4.0f);
+                u8 a = (u8)std::clamp((int)std::lround(((float)(p0.a+p1.a+p2.a+p3.a))/4.0f),0,255);
+                
+                newRgba[(y * newWidth) + x] = {(u8)std::clamp((int)std::lround(r*255.0f),0,255),(u8)std::clamp((int)std::lround(g*255.0f),0,255),(u8)std::clamp((int)std::lround(b*255.0f),0,255),a};
+            }
+        }
+
+        mWidth = newWidth;
+        mHeight = newHeight;
+        mRgba = std::move(newRgba);
+    }
+
     virtual std::vector<u8> toTIMG() {
         std::vector<u8> timg;
 
-        int widthInBlocks = (mHeader.width + getBlockWidth() - 1) / getBlockWidth();
-        int heightInBlocks = (mHeader.height + getBlockHeight() - 1) / getBlockHeight();
-
-        for (int y = 0; y < heightInBlocks; y++) {
-            for (int x = 0; x < widthInBlocks; x++) {
-                const auto block = packBlock(x * getBlockWidth(), y * getBlockHeight());
-                timg.insert(timg.end(), block.begin(), block.end());
+        for (int m = 0; m < mHeader.mipmapCount; m++) {
+            int widthInBlocks = (mWidth + getBlockWidth() - 1) / getBlockWidth();
+            int heightInBlocks = (mHeight + getBlockHeight() - 1) / getBlockHeight();
+            for (int y = 0; y < heightInBlocks; y++) {
+                for (int x = 0; x < widthInBlocks; x++) {
+                    const auto block = packBlock(x * getBlockWidth(), y * getBlockHeight());
+                    timg.insert(timg.end(), block.begin(), block.end());
+                }
+            }
+            if (m != mHeader.mipmapCount-1) {
+                mipmap();
             }
         }
 
@@ -670,8 +721,8 @@ struct ImageConvertPaletteBase : ImageConvertBase {
     }
 
     u16 readIndexBuffer(int x, int y) {
-        if (x < mHeader.width && y < mHeader.height) {
-            return mIndexBuffer[(y * mHeader.width) + x];
+        if (x < mWidth && y < mHeight) {
+            return mIndexBuffer[(y * mWidth) + x];
         }
         return 0;
     }
