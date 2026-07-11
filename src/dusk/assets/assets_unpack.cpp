@@ -4,6 +4,7 @@
 #include "dusk/assets/iso.hpp"
 #include "dusk/assets/arc.hpp"
 #include "dusk/assets/timg.hpp"
+#include "dusk/assets/ast.hpp"
 #include "dusk/io.hpp"
 
 #include "JSystem/JKernel/JKRDecomp.h"
@@ -22,7 +23,10 @@ const std::unordered_map<std::string, unpackConvertFunctionType> unpackConvTable
     {".iso", iso_unpack},
     {".arc", arc_unpack},
     {"speakerse.arc", assets_unpack_convertFunction_None},
+    {"SpeakerSe.arc", assets_unpack_convertFunction_None},
+    {"HomeButton.arc", assets_unpack_convertFunction_None},
     {".bti", bti_unpack},
+    {".ast", ast_unpack}
 };
 
 // const std::unordered_map<std::string, unpackConvertFunctionType> convTable = {
@@ -82,8 +86,23 @@ std::filesystem::path assets_unpack_write(
 }
 
 int assets_unpack_main(const std::filesystem::path& input, const std::filesystem::path& output) {
-    const auto buffer = dusk::io::FileStream::ReadAllBytes(input);
-    assets_unpack_write(output, std::span<const u8>(buffer), input);
+    std::filesystem::path absoluteInput = std::filesystem::absolute(input);
+    std::filesystem::path absoluteOutput = std::filesystem::absolute(output);
+    if (std::filesystem::is_directory(absoluteInput)) {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(absoluteInput
+                 )) {
+            if (!entry.is_directory()) {
+                auto rel = absoluteOutput / std::filesystem::relative(entry.path(),absoluteInput);
+                std::filesystem::create_directories(rel.parent_path());
+                const auto buffer = dusk::io::FileStream::ReadAllBytes(entry.path());
+                printf("%s -> %s\n",entry.path().c_str(),rel.c_str());
+                assets_unpack_write(rel, std::span<const u8>(buffer), entry.path());
+            }
+        }
+    } else {
+        const auto buffer = dusk::io::FileStream::ReadAllBytes(absoluteInput);
+        assets_unpack_write(absoluteOutput, std::span<const u8>(buffer), absoluteInput);
+    }
     return 0;
 }
 
