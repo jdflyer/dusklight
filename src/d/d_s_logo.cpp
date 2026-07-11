@@ -24,7 +24,6 @@
 #include "JSystem/JUtility/JUTConsole.h"
 
 #ifdef TARGET_PC
-#include <sstream>
 #include "dusk/logging.h"
 #include "dusk/version.hpp"
 #include "dusk/main.h"
@@ -795,33 +794,16 @@ void dScnLogo_c::nextSceneChange() {
             } else if (dusk::SaveRequested == 0xff) {
                 // This indicates that the save has loaded, but we are waiting for the scene
                 // manager to change to play
-            } else if (dusk::StageRequested.size() > 0) {
-                
+            } else if (dusk::StageRequested.set) {
+                // Do nothing if we need to request a stage to load later in the function
             } else{
 #endif
                 dComIfG_changeOpeningScene(this, fpcNm_OPENING_SCENE_e);
 #ifdef TARGET_PC
             }
 
-            if (dusk::StageRequested.size() > 0) {
-                std::stringstream ss(dusk::StageRequested);
-                std::string token;
-
-                std::getline(ss,token,',');
-                std::string stageName = token;
-                s8 room = 0;
-                s16 point = 0;
-                s8 layer = -1;
-                if (std::getline(ss,token,',')) {
-                    room = std::stoi(token);
-                    if (std::getline(ss,token,',')) {
-                        point = std::stoi(token);
-                        if (std::getline(ss,token,',')) {
-                            layer = std::stoi(token);
-                        }
-                    }
-                }
-
+            if (dusk::StageRequested.set) {
+                // If we aren't loading a save, initialize a blank save file and request the correct scene to load
                 if (dusk::SaveRequested == 0) {
                     dComIfGs_init();
 
@@ -830,10 +812,10 @@ void dScnLogo_c::nextSceneChange() {
                 }
 
                 // Use both to force-set start stage
-                dComIfGp_setNextStage(stageName.c_str(), point, room, layer);
-                g_dComIfG_gameInfo.play.mNextStage.getStartStage()->set(stageName.c_str(),point,room,layer);
+                dComIfGp_setNextStage(dusk::StageRequested.stage.c_str(), dusk::StageRequested.point, dusk::StageRequested.room, dusk::StageRequested.layer);
+                g_dComIfG_gameInfo.play.mNextStage.getStartStage()->set(dusk::StageRequested.stage.c_str(), dusk::StageRequested.room, dusk::StageRequested.point, dusk::StageRequested.layer);
 
-                dusk::StageRequested = ""; //Reset so we don't re-do this
+                dusk::StageRequested.set = false; // Setting the stage should only happen once
             }
 #endif
         } else {

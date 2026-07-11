@@ -42,6 +42,7 @@
 #include "m_Do/m_Do_ext2.h"
 #include "SSystem/SComponent/c_counter.h"
 #include <cstring>
+#include <sstream>
 
 #include <filesystem>
 #include <system_error>
@@ -126,7 +127,7 @@ bool dusk::IsShuttingDown = false;
 bool dusk::IsGameLaunched = false;
 bool dusk::RestartRequested = false;
 uint8_t dusk::SaveRequested = 0;
-std::string dusk::StageRequested;
+dusk::StageRequest dusk::StageRequested = {"",false};
 std::filesystem::path dusk::ConfigPath;
 std::filesystem::path dusk::CachePath;
 #endif
@@ -504,8 +505,6 @@ int game_main(int argc, char* argv[]) {
     }
     mainCalled = true;
 
-    dusk::registerSettings();
-
     cxxopts::ParseResult parsed_arg_options;
 
     try {
@@ -521,7 +520,7 @@ int game_main(int argc, char* argv[]) {
             ("cvar", "Override configuration variables without modifying config", cxxopts::value<std::vector<std::string>>())
             ("develop", "Enable the game's developer mode and OSReport for debugging", cxxopts::value<bool>()->default_value("false")->implicit_value("true"))
             ("load-save", "Skip the opening and load a save from slot 1-3", cxxopts::value<uint8_t>()->default_value("0"))
-            ("stage", "Upon launching, load a stage, room, spawn point, and layer. Format (STAGE,ROOM,POINT,LAYER). Example: (STAGE) or (STAGE,0,0,-1)", cxxopts::value<std::string>());
+            ("stage", "Upon launching, load a stage, room, spawn point, and layer. When using --load-save, it uses the specified save on the loaded stage. Format (STAGE,ROOM,POINT,LAYER). Example: (STAGE) or (STAGE,0,0,-1)", cxxopts::value<std::string>());
 
         arg_options.parse_positional({"dvd"});
         arg_options.positional_help("<dvd-image>");
@@ -534,11 +533,52 @@ int game_main(int argc, char* argv[]) {
             printf("%s", (arg_options.help() + "\n").c_str());
             exit(0);
         }
+
+        if (parsed_arg_options.count("stage")) {
+            std::stringstream ss(parsed_arg_options["stage"].as<std::string>());
+            std::string token;
+
+            std::getline(ss,token,',');
+            std::string stageName = token;
+            s8 room = 0;
+            s16 point = 0;
+            s8 layer = -1;
+            if (std::getline(ss,token,',')) {
+                room = std::stoi(token);
+                if (std::getline(ss,token,',')) {
+                    point = std::stoi(token);
+                    if (std::getline(ss,token,',')) {
+                        layer = std::stoi(token);
+                    }
+                }
+            }
+
+            dusk::StageRequested = {stageName,true, room,point,layer};
+        }
     }
     catch (const cxxopts::exceptions::exception& e) {
         fprintf(stderr, "Argument Error: %s\n", e.what());
         exit(1);
     }
+    catch (const std::invalid_argument& e) {
+        // Handle parsing std::stoi when loading a stage
+        fprintf(stderr, "Fatal: Invalid Argument When Parsing Stage\n");
+        exit(1);
+    }
+    catch (const std::out_of_range& e) {
+        // Handle parsing std::stoi when loading a stage
+        fprintf(stderr, "Fatal: Argument Out of Range In Parsing Stage\n");
+        exit(1);
+    }
+
+    if (parsed_arg_options.contains("load-save")){
+        uint8_t slot = parsed_arg_options["load-save"].as<uint8_t>();
+        if (slot >= 1 && slot <= 3) {
+            dusk::SaveRequested = slot;
+        }
+    }
+
+    dusk::registerSettings();
 
     const auto startupLogLevel =
         static_cast<AuroraLogLevel>(parsed_arg_options["log-level"].as<uint8_t>());
@@ -693,7 +733,7 @@ int game_main(int argc, char* argv[]) {
         saveConfigBeforePrelaunch = true;
     }
 
-    std::string dvd_path;
+    std::string dvd_path = dusk::getSettings().backend.isoPath;
     bool dvd_opened = false;
     if (parsed_arg_options.count("dvd")) {
         dvd_path = parsed_arg_options["dvd"].as<std::string>();
@@ -716,6 +756,22 @@ int game_main(int argc, char* argv[]) {
         }
     }
 
+    bool skipPreLaunchUI = dusk::getSettings().backend.skipPreLaunchUI.getValue();
+
+    // If we can't load right into the game, stop requesting to load a stage or save
+    if (forcePreLaunchUI || dvd_path.empty()) {
+        if (dusk::StageRequested.set) {
+            DuskLog.warn("Cannot load stage {} because no iso path is set, opening prelaunch UI",dusk::StageRequested.stage);
+            dusk::StageRequested = {};
+        }
+        if (dusk::SaveRequested) {
+            DuskLog.warn("Cannot load save {} because no iso path is set, opening prelaunch UI",dusk::SaveRequested);
+            dusk::SaveRequested = 0;
+        }
+    }else if (dusk::StageRequested.set || dusk::SaveRequested) {
+        skipPreLaunchUI = true;
+    }
+
     dusk::iso::log_verification_state(
         dusk::getSettings().backend.isoPath.getValue(),
         dusk::getSettings().backend.isoVerification.getValue());
@@ -724,7 +780,7 @@ int game_main(int argc, char* argv[]) {
         if (dusk::getSettings().backend.isoPath.getValue().empty()) {
             forcePreLaunchUI = true;
         }
-        if (forcePreLaunchUI && dusk::getSettings().backend.skipPreLaunchUI.getValue()) {
+        if (forcePreLaunchUI && skipPreLaunchUI) {
             DuskLog.warn("Prelaunch UI was disabled with no usable DVD image, enabling prelaunch UI");
             dusk::getSettings().backend.skipPreLaunchUI.setValue(false);
             saveConfigBeforePrelaunch = true;
@@ -733,7 +789,7 @@ int game_main(int argc, char* argv[]) {
             dusk::config::save();
         }
 
-        if (!dusk::getSettings().backend.skipPreLaunchUI) {
+        if (!skipPreLaunchUI) {
             dusk::ui::push_document(std::make_unique<dusk::ui::Prelaunch>(), true);
 
             // pre game launch ui main loop
@@ -752,7 +808,6 @@ int game_main(int argc, char* argv[]) {
         }
 
         dvd_path = dusk::getSettings().backend.isoPath;
-
         if (dvd_path.empty()) {
             DuskLog.fatal("No DVD image specified, unable to boot!");
         }
@@ -794,17 +849,6 @@ int game_main(int argc, char* argv[]) {
 
     // Global Context Init
     dComIfG_ct();
-
-    // Load save from here
-    if (parsed_arg_options.contains("load-save")){
-        uint8_t slot = parsed_arg_options["load-save"].as<uint8_t>();
-        if (slot >= 1 && slot <= 3) {
-            dusk::SaveRequested = slot;
-        }   
-    }
-    if (parsed_arg_options.contains("stage")) {
-        dusk::StageRequested = parsed_arg_options["stage"].as<std::string>();
-    }
 
     mDoDvdThd::SyncWidthSound = false;
 
