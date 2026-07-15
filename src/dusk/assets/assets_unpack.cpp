@@ -5,6 +5,7 @@
 #include "dusk/assets/arc.hpp"
 #include "dusk/assets/timg.hpp"
 #include "dusk/assets/ast.hpp"
+#include "dusk/assets/bmd.hpp"
 #include "dusk/io.hpp"
 
 #include "JSystem/JKernel/JKRDecomp.h"
@@ -26,7 +27,8 @@ const std::unordered_map<std::string, unpackConvertFunctionType> unpackConvTable
     {"SpeakerSe.arc", assets_unpack_convertFunction_None},
     {"HomeButton.arc", assets_unpack_convertFunction_None},
     {".bti", bti_unpack},
-    {".ast", ast_unpack}
+    {".ast", ast_unpack},
+    {".bmd", bmd_unpack}
 };
 
 // const std::unordered_map<std::string, unpackConvertFunctionType> convTable = {

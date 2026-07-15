@@ -266,16 +266,6 @@ struct ImageConvertBase {
     }
 };
 
-// http://www.mindcontrol.org/~hplus/graphics/expand-bits.html
-template <u8 v>
-constexpr u8 ExpandTo8(uint8_t n) {
-    if constexpr (v == 3) {
-        return (n << (8 - 3)) | (n << (8 - 6)) | (n >> (9 - 8));
-    } else {
-        return (n << (8 - v)) | (n >> ((v * 2) - 8));
-    }
-}
-
 struct ImageConvertI4 : ImageConvertBase {
     static GXColor I4LowerToRGBA(u8 i4Lower) {
         u8 x = ExpandTo8<4>(i4Lower & 0xF);
@@ -1592,6 +1582,10 @@ const std::vector<u8> bti_pack(const std::filesystem::path& source) {
     data.insert(data.end(), timg.begin(), timg.end());
 
     return data;
+}
+
+GXColor rgb565_to_rgba(u16 rgb565) {
+    return ImageConvertRGB565::RGB565ToRGBA(rgb565);
 }
 
 };  // namespace dusk::assets

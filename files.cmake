@@ -1591,6 +1591,7 @@ set(DUSK_FILES
         src/dusk/assets/arc.cpp
         src/dusk/assets/timg.cpp
         src/dusk/assets/ast.cpp
+        src/dusk/assets/bmd.cpp
 )
 
 set(DUSK_HTTP_BACKEND_FILES
