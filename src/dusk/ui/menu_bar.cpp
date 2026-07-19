@@ -8,6 +8,7 @@
 #include "achievements.hpp"
 #include "aurora/rmlui.hpp"
 #include "dusk/livesplit.h"
+#include "dusk/gamemode.hpp"
 #include "dusk/main.h"
 #include "dusk/mods/svc/ui.hpp"
 #include "dusk/settings.h"
@@ -20,6 +21,7 @@
 #include "mods_window.hpp"
 #include "settings.hpp"
 #include "ui.hpp"
+#include "dusk/ui/prelaunch.hpp"
 #include "warp.hpp"
 #include "window.hpp"
 
@@ -93,9 +95,10 @@ MenuBar::MenuBar()
                                     dismiss(modal);
                                     return;
                                 }
+                                prelaunch_state().showPrelaunchOnReset = true;
                                 JUTGamePad::C3ButtonReset::sResetSwitchPushing = true;
                                 dismiss(modal);
-                                hide(false);
+                                Document::hide(true);
                             },
                     },
                 },
@@ -134,11 +137,11 @@ MenuBar::MenuBar()
         }));
     });
 
-    if (getSettings().game.speedrunMode) {
+    if (dusk::speedrun::isActive()) {
         mTabBar->add_tab("Reset Timer", [this] {
             mTabBar->set_active_tab(-1);
             mDoAud_seStartMenu(kSoundClick);
-            m_speedrunInfo.reset();
+            dusk::speedrun::g_speedrunInfo.reset();
             if (getSettings().game.liveSplitEnabled) {
                 dusk::speedrun::reset();
             }

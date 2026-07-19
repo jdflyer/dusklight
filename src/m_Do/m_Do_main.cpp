@@ -642,12 +642,6 @@ int game_main(int argc, char* argv[]) {
         auroraInfo = aurora_initialize(argc, argv, &config);
     }
 
-    // Apply after aurora_initialize: speedrun mode mutates cvars whose change callbacks push
-    // values into aurora.
-    if (dusk::getSettings().game.speedrunMode) {
-        dusk::resetForSpeedrunMode();
-    }
-
 #ifdef DUSK_DISCORD
     if (dusk::getSettings().game.enableDiscordPresence) {
         dusk::discord::initialize();
@@ -888,6 +882,17 @@ int game_main(int argc, char* argv[]) {
 
     DuskLog.info("Initializing mods...");
     dusk::mods::ModLoader::instance().init();
+
+    // Apply after aurora_initialize: speedrun mode mutates cvars whose change callbacks push
+    // values into aurora.
+    if (dusk::getSettings().game.speedrunMode) {
+        dusk::speedrun::registerSpeedrunGamemode();
+    }
+
+    if (skipPreLaunchUI == true && dusk::gamemode::getGamemodeManager().getRegisteredGamemodes().size() > 1 && dusk::getSettings().backend.skipPreLaunchUI.getValue()) {
+        // Force pre-launch if we have registered gamemodes that we need to choose from
+        dusk::ui::push_document(std::make_unique<dusk::ui::Prelaunch>(), true);
+    }
 
     OSReport("Starting main01 (Game Loop)...\n");
 

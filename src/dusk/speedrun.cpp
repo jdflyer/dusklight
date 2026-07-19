@@ -3,10 +3,37 @@
 #include "dusk/config.hpp"
 #include "m_Do/m_Do_main.h"
 #include <aurora/aurora.h>
+#include "dusk/gamemode.hpp"
+#include "dusk/livesplit.h"
 
-namespace dusk {
+namespace dusk::speedrun {
 
-SpeedrunInfo m_speedrunInfo;
+SpeedrunInfo g_speedrunInfo;
+
+static void onSpeedrunModeActive() {
+    resetForSpeedrunMode();
+}
+
+static void onSpeedrunModeDeactive() {
+    restoreFromSpeedrunMode();
+    if (getSettings().game.liveSplitEnabled) {
+        speedrun::disconnectLiveSplit();
+    }
+}
+
+void registerSpeedrunGamemode() {
+    dusk::gamemode::Gamemode speedrunGamemode(DUSK_SPEEDRUN_GAMEMODE_ID,"Speedrun","gczelda2-speedrun");
+    speedrunGamemode.mOnSaveLoadedFunction = dusk::speedrun::start;
+    speedrunGamemode.mOnActivatedFunction = onSpeedrunModeActive;
+    speedrunGamemode.mOnDeactivatedFunction = onSpeedrunModeDeactive;
+    speedrunGamemode.mOnTickFunction = dusk::speedrun::onGameFrame;
+
+    dusk::gamemode::getGamemodeManager().registerGamemode(speedrunGamemode);
+}
+
+void unregisterSpeedrunGamemode() {
+    dusk::gamemode::getGamemodeManager().unregisterGamemode(DUSK_SPEEDRUN_GAMEMODE_ID);
+}
 
 void resetForSpeedrunMode() {
     mDoMain::developmentMode = -1;

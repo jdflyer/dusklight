@@ -289,7 +289,7 @@ void Overlay::update() {
     update_pipeline_progress();
 
 #if !(defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IOS && !TARGET_OS_MACCATALYST))
-    if (getSettings().game.speedrunMode && getSettings().game.liveSplitEnabled) {
+    if (dusk::speedrun::isActive() && getSettings().game.liveSplitEnabled) {
         dusk::speedrun::updateLiveSplit();
         if (dusk::speedrun::consumeConnectedEvent()) {
             push_toast({.title = "LiveSplit connected", .duration = std::chrono::seconds(3)});
@@ -301,33 +301,33 @@ void Overlay::update() {
 #endif
 
     if (mSpeedrunTimer != nullptr && mSpeedrunRta != nullptr && mSpeedrunIgt != nullptr) {
-        if (getSettings().game.speedrunMode) {
+        if (dusk::speedrun::isActive()) {
             // L+R+A+Start to reset timer
             if (mDoCPd_c::getHoldL(PAD_1) && mDoCPd_c::getHoldR(PAD_1) &&
                 mDoCPd_c::getHoldA(PAD_1) && mDoCPd_c::getTrigZ(PAD_1))
             {
-                m_speedrunInfo.reset();
+                dusk::speedrun::g_speedrunInfo.reset();
             }
 
             // L+R+A+Y to manually stop timer
             if (mDoCPd_c::getHoldL(PAD_1) && mDoCPd_c::getHoldR(PAD_1) &&
                 mDoCPd_c::getHoldA(PAD_1) && mDoCPd_c::getTrigY(PAD_1))
             {
-                if (m_speedrunInfo.m_isRunStarted) {
-                    m_speedrunInfo.m_endTimestamp = OSGetTime() - m_speedrunInfo.m_startTimestamp;
-                    m_speedrunInfo.m_isRunStarted = false;
+                if (dusk::speedrun::g_speedrunInfo.m_isRunStarted) {
+                    dusk::speedrun::g_speedrunInfo.m_endTimestamp = OSGetTime() - dusk::speedrun::g_speedrunInfo.m_startTimestamp;
+                    dusk::speedrun::g_speedrunInfo.m_isRunStarted = false;
                 }
             }
 
             OSTime elapsedTime = 0;
-            if (m_speedrunInfo.m_isRunStarted) {
-                elapsedTime = OSGetTime() - m_speedrunInfo.m_startTimestamp;
-            } else if (m_speedrunInfo.m_endTimestamp != 0) {
-                elapsedTime = m_speedrunInfo.m_endTimestamp;
+            if (dusk::speedrun::g_speedrunInfo.m_isRunStarted) {
+                elapsedTime = OSGetTime() - dusk::speedrun::g_speedrunInfo.m_startTimestamp;
+            } else if (dusk::speedrun::g_speedrunInfo.m_endTimestamp != 0) {
+                elapsedTime = dusk::speedrun::g_speedrunInfo.m_endTimestamp;
             }
 
-            if (!m_speedrunInfo.m_isPauseIGT) {
-                m_speedrunInfo.m_igtTimer = elapsedTime - m_speedrunInfo.m_totalLoadTime;
+            if (!dusk::speedrun::g_speedrunInfo.m_isPauseIGT) {
+                dusk::speedrun::g_speedrunInfo.m_igtTimer = elapsedTime - dusk::speedrun::g_speedrunInfo.m_totalLoadTime;
             }
 
             mSpeedrunTimer->SetAttribute("open", "");
@@ -340,7 +340,7 @@ void Overlay::update() {
             }
 
             mSpeedrunIgt->SetInnerRML(
-                escape(fmt::format("IGT  {}", FormatTime(m_speedrunInfo.m_igtTimer))));
+                escape(fmt::format("IGT  {}", FormatTime(dusk::speedrun::g_speedrunInfo.m_igtTimer))));
         } else {
             mSpeedrunTimer->RemoveAttribute("open");
         }

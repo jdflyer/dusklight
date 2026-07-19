@@ -22,6 +22,7 @@
 #include "dusk/main.h"
 #include "dusk/settings.h"
 #include "dusk/ui/ui.hpp"
+#include "dusk/gamemode.hpp"
 #include "f_pc/f_pc_manager.h"
 #include "f_pc/f_pc_name.h"
 #include "m_Do/m_Do_controller_pad.h"
@@ -285,7 +286,7 @@ namespace dusk {
 
         if (dusk::IsGameLaunched && !m_isLaunchInitialized) {
             m_isLaunchInitialized = true;
-            if (getSettings().game.speedrunMode && getSettings().game.liveSplitEnabled) {
+            if (dusk::speedrun::isActive() && getSettings().game.liveSplitEnabled) {
                 dusk::speedrun::connectLiveSplit();
             }
         }
@@ -357,7 +358,7 @@ namespace dusk {
 
         m_menuTools.ShowInputViewer();
 
-        if (dusk::IsGameLaunched && !dusk::getSettings().game.speedrunMode) {
+        if (dusk::IsGameLaunched && !dusk::speedrun::isActive()) {
             m_menuTools.ShowDebugOverlay();
             m_menuTools.ShowCameraOverlay();
             m_menuTools.ShowProcessManager();

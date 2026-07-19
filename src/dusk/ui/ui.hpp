@@ -10,6 +10,8 @@
 
 #include "nav_types.hpp"
 
+#include "Z2AudioLib/Z2SeMgr.h"
+
 namespace dusk::ui {
 class Document;
 

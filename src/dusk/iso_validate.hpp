@@ -2,6 +2,7 @@
 #define DUSK_ISO_VALIDATE_HPP
 
 #include <atomic>
+#include "dusk/settings.h"
 
 namespace dusk::iso {
 struct KnownDisc;

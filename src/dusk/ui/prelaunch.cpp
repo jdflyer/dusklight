@@ -3,9 +3,11 @@
 #include "dusk/config.hpp"
 #include "dusk/data.hpp"
 #include "dusk/file_select.hpp"
+#include "dusk/gamemode.hpp"
 #include "dusk/iso_validate.hpp"
 #include "dusk/main.h"
 #include "dusk/settings.h"
+#include "dusk/ui/menu_bar.hpp"
 #include "dusk/update_check.hpp"
 #include "modal.hpp"
 #include "mods_window.hpp"
@@ -685,61 +687,42 @@ void try_apply_mirrored_layout(Rml::Element* body) {
     body->SetClass("mirrored", getSettings().game.enableMirrorMode.getValue());
 }
 
-Prelaunch::Prelaunch()
-    : Document(kDocumentSource, false, DocumentScope::Prelaunch),
-      mRoot(mDocument->GetElementById("root")) {
+void Prelaunch::rebuild_menu_buttons() {
+    for (auto& doc : get_document_stack()) {
+        if (auto* prelaunch = dynamic_cast<Prelaunch*>(doc.get())) {
+            auto* menuList = prelaunch->mDocument->GetElementById("menu-list");
+            while (menuList->GetNumChildren() > 0) {
+                menuList->RemoveChild(menuList->GetChild(0));
+            }
+            prelaunch->mMenuButtons.clear();
+            prelaunch->build_menu_buttons();
+            break;
+        }
+    }
+}
+
+static std::string getPlayButtonText() {
+    auto& state = prelaunch_state();
+    const bool activeDiscLoaded = !state.activeDiscPath.empty();
+    if (activeDiscLoaded == false) {
+        return "Select Disc Image";
+    }
+    std::string playText;
+    const dusk::gamemode::Gamemode* currentGameMode =
+        dusk::gamemode::getGamemodeManager().getCurrentGamemode();
+    if (currentGameMode != nullptr) {
+        return currentGameMode->getId() == "vanilla" ? "Play" :
+                                                       "Play " + currentGameMode->getFullName();
+    }
+    return "Play";
+}
+
+Prelaunch::Prelaunch() : Document(kDocumentSource, false, DocumentScope::Prelaunch) {
+    mRoot = mDocument->GetElementById("root");
     ensure_initialized();
     begin_update_check();
 
-    if (auto* menuList = mDocument->GetElementById("menu-list")) {
-        auto& state = prelaunch_state();
-        const bool activeDiscLoaded = !state.activeDiscPath.empty();
-        mMenuButtons.push_back(
-            std::make_unique<Button>(menuList, activeDiscLoaded ? "Play" : "Select Disc Image"));
-        mMenuButtons.back()->on_pressed([this] {
-            if (prelaunch_state().activeDiscPath.empty()) {
-                open_iso_picker();
-                return;
-            }
-
-            mDoAud_seStartMenu(kSoundPlay);
-            show_menu_notification();
-
-            if (getSettings().audio.menuSounds) {
-                JAISoundHandle* handle = g_mEnvSeMgr.field_0x144.getHandle();
-                if (*handle) {
-                    (*handle)->stop(60);
-                    (*handle)->releaseHandle();
-                }
-            }
-
-            if (g_mDoMemCd_control.mCardCommand == mDoMemCd_Ctrl_c::Command_e::COMM_NONE_e) {
-                mDoMemCd_ThdInit();
-            }
-
-            IsGameLaunched = true;
-            pop();
-        });
-        apply_intro_animation(mMenuButtons.back()->root(), "delay-1");
-
-        mMenuButtons.push_back(std::make_unique<Button>(menuList, "Settings"));
-        mMenuButtons.back()->on_pressed([this] {
-            mRestartSuppressed = false;
-            push(std::make_unique<SettingsWindow>(true));
-        });
-        apply_intro_animation(mMenuButtons.back()->root(), "delay-2");
-
-        mMenuButtons.push_back(std::make_unique<Button>(menuList, "Mods"));
-        mMenuButtons.back()->on_pressed([this] {
-            mRestartSuppressed = false;
-            push(std::make_unique<ModsWindow>());
-        });
-        apply_intro_animation(mMenuButtons.back()->root(), "delay-3");
-
-        mMenuButtons.push_back(std::make_unique<Button>(menuList, "Quit"));
-        mMenuButtons.back()->on_pressed([] { IsRunning = false; });
-        apply_intro_animation(mMenuButtons.back()->root(), "delay-4");
-    }
+    build_menu_buttons();
 
     mDiscStatus = mDocument->GetElementById("disc-status");
     mDiscDetail = mDocument->GetElementById("disc-version");
@@ -775,6 +758,125 @@ Prelaunch::Prelaunch()
             target->SetClass("anim-done", true);
         }
     });
+}
+
+void Prelaunch::build_menu_buttons() {
+    if (auto* menuList = mDocument->GetElementById("menu-list")) {
+        // Set the gamemode to the last used before showing the play button
+        dusk::gamemode::getGamemodeManager().setGamemodeToPrevious();
+
+        mMenuButtons.push_back(std::make_unique<Button>(menuList, getPlayButtonText()));
+        mMenuButtons.back()->on_pressed([this] {
+            if (prelaunch_state().activeDiscPath.empty()) {
+                open_iso_picker();
+                return;
+            }
+
+            mDoAud_seStartMenu(kSoundPlay);
+            show_menu_notification();
+
+            if (getSettings().audio.menuSounds) {
+                JAISoundHandle* handle = g_mEnvSeMgr.field_0x144.getHandle();
+                if (*handle) {
+                    (*handle)->stop(60);
+                    (*handle)->releaseHandle();
+                }
+            }
+
+            if (g_mDoMemCd_control.mCardCommand == mDoMemCd_Ctrl_c::Command_e::COMM_NONE_e) {
+                mDoMemCd_ThdInit();
+            }
+
+            prelaunch_state().firstLaunch = false;
+            const dusk::gamemode::Gamemode* gamemode =
+                dusk::gamemode::getGamemodeManager().getCurrentGamemode();
+            if (gamemode) {
+                gamemode->mOnPlayFunction();
+            }
+
+            IsGameLaunched = true;
+            pop();
+
+            // If we deleted the menubar on a previous reset, create it again here
+            bool menuBarExists = false;
+            for (auto& doc : dusk::ui::get_document_stack()) {
+                if (auto* menubar = dynamic_cast<dusk::ui::MenuBar*>(doc.get())) {
+                    menuBarExists = true;
+                    break;
+                }
+            }
+            if (menuBarExists) {
+                MenuBar::rebuild();
+            }else{
+                dusk::ui::push_document(std::make_unique<dusk::ui::MenuBar>(), false);
+            }
+        });
+        apply_intro_animation(mMenuButtons.back()->root(), "delay-1");
+
+        // If we have more gamemodes registered than the default vanilla, show the gamemode
+        // selection
+        if (dusk::gamemode::getGamemodeManager().getRegisteredGamemodes().size() > 1) {
+            mMenuButtons.push_back(std::make_unique<Button>(menuList, "Select Gamemode"));
+            mMenuButtons.back()->on_pressed([this] {
+                std::vector<ModalAction> gamemodeActions;
+                gamemodeActions.push_back(dusk::ui::ModalAction{
+                    .label = "Vanilla", .onPressed = [this](dusk::ui::Modal& modal) {
+                        mDoAud_seStartMenu(kSoundClick);
+                        dusk::gamemode::getGamemodeManager().setCurrentGamemode("vanilla");
+                        modal.pop();
+                        update();
+                    }});
+                for (const auto& [id, gamemode] :
+                    dusk::gamemode::getGamemodeManager().getRegisteredGamemodes())
+                {
+                    if (id == "vanilla") {
+                        // Force vanilla to the top
+                        continue;
+                    }
+                    gamemodeActions.push_back(dusk::ui::ModalAction{.label = gamemode.getFullName(),
+                        .onPressed = [this, id](dusk::ui::Modal& modal) {
+                            mDoAud_seStartMenu(kSoundClick);
+                            dusk::gamemode::getGamemodeManager().setCurrentGamemode(id);
+                            modal.pop();
+                            update();
+                        }});
+                }
+                mRestartSuppressed = false;
+                push(std::make_unique<dusk::ui::Modal>(dusk::ui::Modal::Props{
+                    .title = "Play Type",
+                    .bodyRml = "What mode would you like to play?",
+                    .actions = gamemodeActions,
+                    .onDismiss =
+                        [this](dusk::ui::Modal& modal) {
+                            mDoAud_seStartMenu(kSoundWindowClose);
+                            modal.pop();
+                        },
+                    .icon = "question-mark",
+                    .isVertical = true,
+                }));
+            });
+            apply_intro_animation(mMenuButtons.back()->root(), "delay-1");
+        }
+
+        mMenuButtons.push_back(std::make_unique<Button>(menuList, "Settings"));
+        mMenuButtons.back()->on_pressed([this] {
+            mRestartSuppressed = false;
+            bool showPrelaunchSettings = prelaunch_state().firstLaunch;
+            push(std::make_unique<SettingsWindow>(showPrelaunchSettings));
+        });
+        apply_intro_animation(mMenuButtons.back()->root(), "delay-2");
+
+        mMenuButtons.push_back(std::make_unique<Button>(menuList, "Mods"));
+        mMenuButtons.back()->on_pressed([this] {
+            mRestartSuppressed = false;
+            push(std::make_unique<ModsWindow>());
+        });
+        apply_intro_animation(mMenuButtons.back()->root(), "delay-3");
+
+        mMenuButtons.push_back(std::make_unique<Button>(menuList, "Quit"));
+        mMenuButtons.back()->on_pressed([] { IsRunning = false; });
+        apply_intro_animation(mMenuButtons.back()->root(), "delay-4");
+    }
 }
 
 void Prelaunch::show() {
@@ -856,7 +958,7 @@ void Prelaunch::update() {
     }
 
     if (!mMenuButtons.empty()) {
-        mMenuButtons[0]->set_text(activeDiscLoaded ? "Play" : "Select Disc Image");
+        mMenuButtons[0]->set_text(getPlayButtonText());
     }
 
     const auto discStatusLabel = mDiscStatus->GetElementById("disc-status-label");

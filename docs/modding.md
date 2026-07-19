@@ -470,6 +470,53 @@ if (svc_camera->get_camera(mod_ctx, game_view, &camera) == MOD_OK) {
 first in-game frame. Projection matrices match the renderer's WebGPU clip convention and renderer depth convention
 (reversed-Z by default).
 
+### GamemodeService (`mods/svc/gamemode.h`)
+
+Allows a mod to register a gamemode that allows the game to designate one form of gameplay (named a gamemode). This
+is intended to allow large mods that change large amounts of game logic (such as a randomizer) to have explicit control
+over how the game will function at certain points. When a gamemode is registered via the service, it will add an entry
+to the pre-launch menu. When selected, the game will use a unique set of savefiles (designated by the `saveName` field) 
+to store save data while the gamemode is active. Any function pointers registered with the gamemode will be called by
+dusklight when their condition is met.
+
+Note: for any gamemode wishing to use the vanilla set of savefiles, use `gczelda2` as the save file name.
+
+```cpp
+IMPORT_SERVICE(GamemodeService, svc_gamemode);
+
+void onSaveLoaded() {
+    // This function will be invoked by the game as a save is loaded
+}
+
+#define ONLY_GAMEMODE(ctx, id)                                                                                         \
+    {                                                                                                                  \
+        bool isGamemodeActive;                                                                                         \
+        svc_gamemode->is_active(ctx, id, &isGamemodeActive);                                                           \
+        if (!isGamemodeActive) {                                                                                       \
+            return;                                                                                                    \
+        }                                                                                                              \
+    }
+
+static HookAction myFunctionHook(ModContext *ctx, void *args, void *, void *) {
+    // Note: normal function hooks will need to check if the gamemode is active 
+    ONLY_GAMEMODE(ctx,"id"); // A macro like this can make it easy
+}
+
+const GamemodeDesc gamemodeDesc = {
+    .gamemodeId = "my-unique-gamemode-id",
+    .fullName = "Gamemode Name",
+    .saveName = "my-unique-save-name",
+    .onActivatedFunction = nullptr,
+    .onDeactivatedFunction = nullptr,
+    .onPlayFunction = nullptr,
+    .onSaveLoadedFunction = onSaveLoaded,
+    .onNewSaveFunction = nullptr,
+    .onGameResetFunction = nullptr,
+    .onTickFunction = nullptr,
+};
+svc_gamemode->register_gamemode(mod_ctx, &gamemodeDesc);
+```
+
 ---
 
 ## Hooking Game Functions

@@ -29,6 +29,7 @@
 
 #if TARGET_PC
 #include "dusk/settings.h"
+#include "dusk/gamemode.hpp"
 #include <f_ap/f_ap_game.h>
 
 #include "helpers/string.hpp"
@@ -1531,6 +1532,13 @@ void dSv_save_c::init() {
 
     mEvent.init();
     mMiniGame.init();
+    
+#ifdef TARGET_PC
+    const dusk::gamemode::Gamemode* gamemode = dusk::gamemode::getGamemodeManager().getCurrentGamemode();
+    if (gamemode) {
+        gamemode->mOnNewSaveFunction();
+    }
+#endif
 }
 
 dSv_memory2_c* dSv_save_c::getSave2(int i_stage2No) {

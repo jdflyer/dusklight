@@ -31,6 +31,7 @@
 #include <dusk/gamepad_color.h>
 #include <dusk/autosave.h>
 #include "dusk/menu_pointer.h"
+#include "dusk/gamemode.hpp"
 #endif
 
 fapGm_HIO_c::fapGm_HIO_c() {
@@ -845,7 +846,10 @@ void fapGm_Execute() {
 
     cCt_Counter(0);
 #ifdef TARGET_PC
-    dusk::speedrun::onGameFrame();
+    const dusk::gamemode::Gamemode* gamemode = dusk::gamemode::getGamemodeManager().getCurrentGamemode();
+    if (gamemode) {
+        gamemode->mOnTickFunction();
+    }
     dusk::AchievementSystem::get().tick();
     dusk::menu_pointer::end_game_frame();
 #endif

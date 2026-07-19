@@ -4,20 +4,26 @@
  */
 
 #include "m_Do/m_Do_Reset.h"
+#include <gx.h>
 #include "JSystem/JAudio2/JASDvdThread.h"
 #include "JSystem/JUtility/JUTGamePad.h"
 #include "JSystem/JUtility/JUTXfb.h"
 #include "SSystem/SComponent/c_API_controller_pad.h"
-#include <gx.h>
-#include "m_Do/m_Do_audio.h"
 #include "m_Do/m_Do_DVDError.h"
-#include "m_Do/m_Do_ext.h"
 #include "m_Do/m_Do_MemCard.h"
+#include "m_Do/m_Do_audio.h"
+#include "m_Do/m_Do_ext.h"
 
 #if !PLATFORM_GCN
 #include <revolution/os.h>
 #endif
 #include "os_report.h"
+
+#ifdef TARGET_PC
+#include "dusk/ui/prelaunch.hpp"
+#include "dusk/ui/menu_bar.hpp"
+#include "dusk/gamemode.hpp"
+#endif
 
 static void my_OSCancelAlarmAll() {}
 
@@ -104,6 +110,13 @@ void checkDiskCallback(s32 result, DVDCommandBlock* block) {
 }
 
 void mDoRst_resetCallBack(int port, void*) {
+#ifdef TARGET_PC
+    const dusk::gamemode::Gamemode* gamemode = dusk::gamemode::getGamemodeManager().getCurrentGamemode();
+    if (gamemode) {
+        gamemode->mOnGameResetFunction();
+    }
+#endif
+
     if (mDoRst::isReset()) {
         return;
     }
@@ -129,7 +142,8 @@ void mDoRst_resetCallBack(int port, void*) {
 #else
     DVDCommandBlock block;
     block.userData = (void*)-1;
-    while (DVDCheckDiskAsync(&block, checkDiskCallback));
+    while (DVDCheckDiskAsync(&block, checkDiskCallback))
+        ;
     do {
         check = (int)block.userData;
     } while (check == -1);
@@ -141,6 +155,29 @@ void mDoRst_resetCallBack(int port, void*) {
         }
     }
     mDoRst::onReset();
+#ifdef TARGET_PC
+    // Show pre-launch only if we have a registered gamemode and are resetting from the menubar
+    if (dusk::ui::prelaunch_state().showPrelaunchOnReset == false || dusk::gamemode::getGamemodeManager().getRegisteredGamemodes().size() == 1) {
+        return;
+    }
+
+    bool prelaunchExists = false;
+    for (auto& doc : dusk::ui::get_document_stack()) {
+        if (auto* menubar = dynamic_cast<dusk::ui::MenuBar*>(doc.get())) {
+            // Hide the menu bar
+            menubar->Document::hide(true);
+        }
+        if (auto* prelaunch = dynamic_cast<dusk::ui::Prelaunch*>(doc.get())) {
+            prelaunchExists = true;
+            prelaunch->focus();
+        }
+    }
+    if (prelaunchExists == false) {
+        dusk::ui::Prelaunch& prelaunch = static_cast<dusk::ui::Prelaunch&>(dusk::ui::push_document(std::make_unique<dusk::ui::Prelaunch>(), true));
+        prelaunch.focus();
+    }
+    dusk::ui::prelaunch_state().showPrelaunchOnReset = false;
+#endif
 }
 
 void mDoRst_shutdownCallBack() {

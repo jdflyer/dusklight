@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include "dusk/gamemode.hpp"
+#include "dusk/speedrun.h"
 
 namespace dusk::speedrun {
 void onGameFrame();

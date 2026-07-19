@@ -282,6 +282,8 @@ struct UserSettings {
         ConfigVar<bool> removeQuestMapMarkers;
         ConfigVar<bool> showInputViewer;
         ConfigVar<bool> showInputViewerGyro;
+
+        ConfigVar<std::string> lastSelectedGamemodeId;
     } game;
 
     struct {

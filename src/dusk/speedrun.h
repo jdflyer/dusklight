@@ -1,7 +1,10 @@
 #pragma once
 #include <aurora/aurora.h>
+#include "dusk/gamemode.hpp"
 
-namespace dusk {
+#define DUSK_SPEEDRUN_GAMEMODE_ID "vanilla_speedrun"
+
+namespace dusk::speedrun {
 
 struct SpeedrunInfo {
     void startRun() {
@@ -34,9 +37,15 @@ struct SpeedrunInfo {
     OSTime m_igtTimer = 0;
 };
 
-extern SpeedrunInfo m_speedrunInfo;
+extern SpeedrunInfo g_speedrunInfo;
 
+void registerSpeedrunGamemode();
+void unregisterSpeedrunGamemode();
 void resetForSpeedrunMode();
 void restoreFromSpeedrunMode();
+
+inline bool isActive() {
+    return dusk::gamemode::getGamemodeManager().isCurrentGamemode(DUSK_SPEEDRUN_GAMEMODE_ID);
+}
 
 }  // namespace dusk
