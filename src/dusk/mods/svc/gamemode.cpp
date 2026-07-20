@@ -110,7 +110,14 @@ ModResult register_gamemode(ModContext* ctx, const GamemodeDesc* desc) {
 }
 
 ModResult unregister_gamemode(ModContext* ctx, const char* id) {
-    dusk::gamemode::getGamemodeManager().unregisterGamemode(get_mod_gamemode_id(ctx,id));
+    std::string fullId = get_mod_gamemode_id(ctx,id);
+    dusk::gamemode::getGamemodeManager().unregisterGamemode(fullId);
+
+    // Remove the gamemode from the service registered gamemodes map
+    auto it = s_gamemodesRegisteredToMods.find(ctx->mod->metadata.id);
+    if (it != s_gamemodesRegisteredToMods.end()) {
+        std::erase(it->second, fullId);
+    }
     return MOD_OK;
 }
 
