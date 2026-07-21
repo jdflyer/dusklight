@@ -484,35 +484,43 @@ Note: for any gamemode wishing to use the vanilla set of savefiles, use `gczelda
 ```cpp
 IMPORT_SERVICE(GamemodeService, svc_gamemode);
 
-void onSaveLoaded() {
-    // This function will be invoked by the game as a save is loaded
-}
-
+#define MY_GAMEMODE_ID "gamemodeid"
 #define ONLY_GAMEMODE(ctx, id)                                                                                         \
     {                                                                                                                  \
         bool isGamemodeActive;                                                                                         \
         svc_gamemode->is_active(ctx, id, &isGamemodeActive);                                                           \
         if (!isGamemodeActive) {                                                                                       \
-            return;                                                                                                    \
+            return HOOK_CONTINUE;                                                                                      \
         }                                                                                                              \
     }
+#define ONLY_GAMEMODE_MYGAMEMODE ONLY_GAMEMODE(ctx, MY_GAMEMODE_ID)
 
 static HookAction myFunctionHook(ModContext *ctx, void *args, void *, void *) {
     // Note: normal function hooks will need to check if the gamemode is active 
-    ONLY_GAMEMODE(ctx,"id"); // A macro like this can make it easy
+    ONLY_GAMEMODE_MYGAMEMODE // A macro like this can make it easy
+
+    // Code that runs when only the Gamemode is active
+
+    return HOOK_CONTINUE;
+}
+
+void onSaveLoaded() {
+    // This function will be invoked by the game as a save is loaded
 }
 
 const GamemodeDesc gamemodeDesc = {
-    .gamemodeId = "my-unique-gamemode-id",
+    .gamemodeId = MY_GAMEMODE_ID,
     .fullName = "Gamemode Name",
-    .saveName = "my-unique-save-name",
-    .onActivatedFunction = nullptr,
-    .onDeactivatedFunction = nullptr,
-    .onPlayFunction = nullptr,
-    .onSaveLoadedFunction = onSaveLoaded,
-    .onNewSaveFunction = nullptr,
-    .onGameResetFunction = nullptr,
-    .onTickFunction = nullptr,
+    // The save name should be something that other gamemodes will not try to use, so appending your name to it
+    // is reccomended
+    .saveName = "my-unique-save-name_developer-name",
+    .onActivatedFunction = nullptr, // Called when the gamemode is selected on the prelaunch menu (or is launched)
+    .onDeactivatedFunction = nullptr, // Called when the gamemode is deselected on the prelaunch menu (or the mod is disabled)
+    .onPlayFunction = nullptr, // Called when "Play" is pressed on the prelaunch menu
+    .onSaveLoadedFunction = onSaveLoaded, // Called when a save is loaded
+    .onNewSaveFunction = nullptr, // Called after a new savefile is created
+    .onGameResetFunction = nullptr, // Called when the game is reset
+    .onTickFunction = nullptr, // Called every game tick while the gamemode is active
 };
 svc_gamemode->register_gamemode(mod_ctx, &gamemodeDesc);
 ```

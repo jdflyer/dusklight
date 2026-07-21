@@ -20,7 +20,12 @@ aurora::Module Log("dusk::mods::gamemode");
 std::unordered_map<std::string, std::vector<std::string>> s_gamemodesRegisteredToMods;
 
 std::string get_mod_gamemode_id(ModContext* ctx, const std::string& id) {
-    return id + "_" + ctx->mod->metadata.id;
+    // Standardize the IDs to include the mod id (to prevent clashes) and set them as lowercase
+    std::string fullId = id + "_" + ctx->mod->metadata.id;
+    std::transform(fullId.begin(),fullId.end(),fullId.begin(),[](unsigned char c) {
+        return std::towlower(c);
+    });
+    return fullId;
 }
 
 void gamemode_remove_mod(LoadedMod& mod) {

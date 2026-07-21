@@ -22,6 +22,7 @@
 #ifdef TARGET_PC
 #include "dusk/ui/prelaunch.hpp"
 #include "dusk/ui/menu_bar.hpp"
+#include "dusk/ui/mods_window.hpp"
 #include "dusk/gamemode.hpp"
 #endif
 
@@ -166,6 +167,10 @@ void mDoRst_resetCallBack(int port, void*) {
         if (auto* menubar = dynamic_cast<dusk::ui::MenuBar*>(doc.get())) {
             // Hide the menu bar
             menubar->Document::hide(true);
+        }
+        if (auto* modwindow = dynamic_cast<dusk::ui::ModsWindow*>(doc.get())) {
+            // Hide the mod window (if we were disasbling or reloading a mod)
+            modwindow->pop();
         }
         if (auto* prelaunch = dynamic_cast<dusk::ui::Prelaunch*>(doc.get())) {
             prelaunchExists = true;
