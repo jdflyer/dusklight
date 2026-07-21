@@ -23,7 +23,7 @@ std::string get_mod_gamemode_id(ModContext* ctx, const std::string& id) {
     // Standardize the IDs to include the mod id (to prevent clashes) and set them as lowercase
     std::string fullId = id + "_" + ctx->mod->metadata.id;
     std::transform(fullId.begin(),fullId.end(),fullId.begin(),[](unsigned char c) {
-        return std::towlower(c);
+        return std::tolower(c);
     });
     return fullId;
 }
